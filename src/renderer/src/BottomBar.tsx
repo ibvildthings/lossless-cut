@@ -475,15 +475,15 @@ function BottomBar({
                   />
                 </>
               )}
-
-              <FaCompressArrowsAlt
-                style={{ fontSize: '1em', padding: '0 .2em', color: collapseTimelineGaps ? primaryTextColor : undefined }}
-                role="button"
-                title={actionTitle(t('Hide removed parts from timeline'), 'toggleCollapseTimelineGaps')}
-                onClick={toggleCollapseTimelineGaps}
-              />
             </>
           )}
+
+          <FaCompressArrowsAlt
+            style={{ fontSize: '1em', padding: '0 .2em', color: collapseTimelineGaps ? primaryTextColor : undefined }}
+            role="button"
+            title={actionTitle(t('Hide removed parts from timeline'), 'toggleCollapseTimelineGaps')}
+            onClick={toggleCollapseTimelineGaps}
+          />
         </div>
 
         <div style={{ flexGrow: 1 }} />
