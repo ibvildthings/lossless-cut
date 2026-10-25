@@ -4,7 +4,7 @@ import { motion } from 'motion/react';
 import { MdRotate90DegreesCcw } from 'react-icons/md';
 import { useTranslation } from 'react-i18next';
 import { IoIosCamera, IoMdKey, IoMdSpeedometer } from 'react-icons/io';
-import { FaYinYang, FaTrashAlt, FaStepBackward, FaStepForward, FaCaretLeft, FaCaretRight, FaPause, FaPlay, FaImages, FaKey, FaExclamationTriangle } from 'react-icons/fa';
+import { FaYinYang, FaTrashAlt, FaStepBackward, FaStepForward, FaCaretLeft, FaCaretRight, FaPause, FaPlay, FaImages, FaKey, FaExclamationTriangle, FaCompressArrowsAlt } from 'react-icons/fa';
 import { GiSoundWaves } from 'react-icons/gi';
 // import useTraceUpdate from 'use-trace-update';
 import invariant from 'tiny-invariant';
@@ -289,7 +289,7 @@ function BottomBar({
   playing, shortStep, togglePlay, toggleLoopSelectedSegments, hasAudio,
   keyframesEnabled, toggleShowKeyframes, seekClosestKeyframe, detectedFps, isFileOpened, selectedSegments,
   darkMode,
-  toggleShowThumbnails, toggleWaveformMode, waveformMode, showThumbnails,
+  toggleShowThumbnails, toggleWaveformMode, waveformMode, showThumbnails, toggleCollapseTimelineGaps,
   outputPlaybackRate, setOutputPlaybackRate,
   formatTimecode, parseTimecode, playbackRate,
   currentFrame, playbackMode, displayTime, fileDurationNonZero, getFrameCount,
@@ -332,6 +332,7 @@ function BottomBar({
   selectedSegments: SegmentColorIndex[],
   darkMode: boolean,
   toggleShowThumbnails: () => void,
+  toggleCollapseTimelineGaps: () => void,
   toggleWaveformMode: () => void,
   waveformMode: WaveformMode | undefined,
   showThumbnails: boolean,
@@ -394,7 +395,7 @@ function BottomBar({
     color: currentFrame != null && currentFrame.keyframe ? primaryTextColor : undefined,
   }), [currentFrame]);
 
-  const { invertCutSegments, setInvertCutSegments, simpleMode, toggleSimpleMode, exportConfirmEnabled } = useUserSettings();
+  const { invertCutSegments, setInvertCutSegments, simpleMode, toggleSimpleMode, exportConfirmEnabled, collapseTimelineGaps } = useUserSettings();
   const actionTitle = useActionTitle();
 
   const rotationStr = `${rotation}°`;
@@ -474,6 +475,13 @@ function BottomBar({
                   />
                 </>
               )}
+
+              <FaCompressArrowsAlt
+                style={{ fontSize: '1em', padding: '0 .2em', color: collapseTimelineGaps ? primaryTextColor : undefined }}
+                role="button"
+                title={actionTitle(t('Hide removed parts from timeline'), 'toggleCollapseTimelineGaps')}
+                onClick={toggleCollapseTimelineGaps}
+              />
             </>
           )}
         </div>

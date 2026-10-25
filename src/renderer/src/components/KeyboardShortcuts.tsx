@@ -717,6 +717,10 @@ const KeyboardShortcuts = memo(({
         name: t('Show keyframes'),
         category: otherCategory,
       },
+      toggleCollapseTimelineGaps: {
+        name: t('Hide removed parts from timeline'),
+        category: otherCategory,
+      },
       readAllKeyframes: {
         name: t('Read all keyframes'),
         category: otherCategory,

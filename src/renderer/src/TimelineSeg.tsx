@@ -12,7 +12,7 @@ import type { FormatTimecode, StateSegment } from './types';
 const markerButtonStyle: React.CSSProperties = { fontSize: 10, minWidth: 0, letterSpacing: '-.1em', color: 'white' };
 
 function Marker({
-  seg, segNum, color, isActive, selected, onClick, getTimePercent, formatTimecode,
+  seg, segNum, color, isActive, selected, onClick, getTimelinePos, formatTimecode,
 }: {
   seg: StateSegment,
   segNum: number,
@@ -20,7 +20,7 @@ function Marker({
   isActive: boolean,
   selected: boolean,
   onClick: () => void,
-  getTimePercent: (a: number) => string,
+  getTimelinePos: (a: number) => number,
   formatTimecode: FormatTimecode,
 }) {
   const { darkMode, prefersReducedMotion, springAnimation } = useUserSettings();
@@ -37,12 +37,12 @@ function Marker({
     position: 'absolute',
     top: 0,
     bottom: 0,
-    left: getTimePercent(seg.start),
+    left: `${getTimelinePos(seg.start) * 100}%`,
     width: 2,
     marginLeft: -1,
     overflow: 'visible',
     backgroundColor: 'var(--gray-12)',
-  }), [getTimePercent, seg.start]);
+  }), [getTimelinePos, seg.start]);
 
   const borderColor = useMemo(() => {
     if (isActive) {
@@ -80,7 +80,7 @@ function Marker({
 }
 
 function Segment({
-  seg, segNum, color, isActive, selected, onClick, getTimePercent, formatTimecode, invertCutSegments,
+  seg, segNum, color, isActive, selected, onClick, getTimelinePos, formatTimecode, invertCutSegments,
 }: {
   seg: Omit<StateSegment, 'end'> & { end: number },
   segNum: number,
@@ -88,7 +88,7 @@ function Segment({
   isActive: boolean,
   selected: boolean,
   onClick: () => void,
-  getTimePercent: (a: number) => string,
+  getTimelinePos: (a: number) => number,
   formatTimecode: FormatTimecode,
   invertCutSegments: boolean,
 }) {
@@ -133,13 +133,13 @@ function Segment({
   }, [formatTimecode, name, seg.end, seg.start]);
 
   const wrapperStyle = useMemo<MotionStyle>(() => {
-    const cutSectionWidth = getTimePercent(seg.end - seg.start);
+    const startPos = getTimelinePos(seg.start);
     return {
       position: 'absolute',
       top: 0,
       bottom: 0,
-      left: getTimePercent(seg.start),
-      width: cutSectionWidth,
+      left: `${startPos * 100}%`,
+      width: `${(getTimelinePos(seg.end) - startPos) * 100}%`,
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'space-between',
@@ -159,7 +159,7 @@ function Segment({
       borderTop: border.horizontal,
       borderBottom: border.horizontal,
     };
-  }, [getTimePercent, seg.end, seg.start, border]);
+  }, [getTimelinePos, seg.end, seg.start, border]);
 
   return (
     <motion.div
@@ -208,10 +208,10 @@ function Segment({
 }
 
 function SegmentOrMarker({
-  seg, fileDurationNonZero, isActive, segNum, onSegClick, invertCutSegments, formatTimecode, selected,
+  seg, getTimelinePos, isActive, segNum, onSegClick, invertCutSegments, formatTimecode, selected,
 } : {
   seg: StateSegment,
-  fileDurationNonZero: number,
+  getTimelinePos: (a: number) => number,
   isActive: boolean,
   segNum: number,
   onSegClick: (a: number) => void,
@@ -223,16 +223,14 @@ function SegmentOrMarker({
 
   const segColor = useMemo(() => getSegColor(seg), [getSegColor, seg]);
 
-  const getTimePercent = (t: number) => `${(t / fileDurationNonZero) * 100}%`;
-
   const onThisSegClick = useCallback(() => onSegClick(segNum), [onSegClick, segNum]);
 
   if (seg.end != null) {
-    return <Segment seg={seg as Omit<StateSegment, 'end'> & { end: number }} segNum={segNum} color={segColor} selected={selected} isActive={isActive} onClick={onThisSegClick} getTimePercent={getTimePercent} formatTimecode={formatTimecode} invertCutSegments={invertCutSegments} />;
+    return <Segment seg={seg as Omit<StateSegment, 'end'> & { end: number }} segNum={segNum} color={segColor} selected={selected} isActive={isActive} onClick={onThisSegClick} getTimelinePos={getTimelinePos} formatTimecode={formatTimecode} invertCutSegments={invertCutSegments} />;
   }
 
   return (
-    <Marker seg={seg} segNum={segNum} color={segColor} selected={selected} isActive={isActive} onClick={onThisSegClick} getTimePercent={getTimePercent} formatTimecode={formatTimecode} />
+    <Marker seg={seg} segNum={segNum} color={segColor} selected={selected} isActive={isActive} onClick={onThisSegClick} getTimelinePos={getTimelinePos} formatTimecode={formatTimecode} />
   );
 }
 

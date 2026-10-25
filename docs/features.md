@@ -13,6 +13,7 @@ Here's everything it can do, and what people use it for. Which functions are ava
 - Type in cut point times
 - Timeline with zoom and frame/keyframe jumping, for cutting around keyframes
 - Video thumbnails and audio waveform on the timeline
+- Hide the removed parts from the timeline, so that the parts you keep fill it, like in a video editor
 - Play or loop the current segment, or all selected segments in order
 - [Smart cut](https://github.com/mifi/lossless-cut/issues/126) (experimental), to allow cutting between keyframes. It doesn't work for all files.
 - Choose between keyframe cut and normal cut, and fine-tune other export options

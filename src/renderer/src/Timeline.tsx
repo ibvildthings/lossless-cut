@@ -1,5 +1,5 @@
 import type { MutableRefObject, CSSProperties, WheelEventHandler, MouseEventHandler } from 'react';
-import { memo, useRef, useMemo, useCallback, useEffect } from 'react';
+import { memo, useRef, useMemo, useCallback, useEffect, useState } from 'react';
 import { motion, useMotionValue, useSpring } from 'motion/react';
 import debounce from 'lodash/debounce';
 import { useTranslation } from 'react-i18next';
@@ -21,41 +21,49 @@ import Button from './components/Button';
 import type { UseSegments } from './hooks/useSegments';
 import { keyMap } from './timelineWheel';
 import { calculateTimelinePercent as calculateTimelinePercent2, calculateTimelinePos } from './util';
+import type { TimelineMapping, TimeRange } from './timelineCollapse';
+import { createTimelineMapping, getVisibleRanges } from './timelineCollapse';
 
-
-type CalculateTimelinePercent = (time: number) => string | undefined;
 
 const currentTimeWidth = 1;
 // contrasting outline, so that the cursor/keyframes are visible on top of any segment color, in both light and dark mode #1199
 const outlineShadow = '0 0 0 1px var(--gray-1)';
 
 // eslint-disable-next-line react/display-name
-const Waveform = memo(({ waveform, calculateTimelinePercent, fileDurationNonZero, darkMode }: {
+const Waveform = memo(({ waveform, mapping, fileDurationNonZero, darkMode }: {
   waveform: RenderableWaveform,
-  calculateTimelinePercent: CalculateTimelinePercent,
+  mapping: TimelineMapping,
   fileDurationNonZero: number,
   darkMode: boolean,
 }) => {
-  const leftPos = 'from' in waveform ? calculateTimelinePercent(waveform.from) : '0%';
+  const from = 'from' in waveform ? waveform.from : 0;
+  const to = 'to' in waveform ? Math.min(waveform.to, fileDurationNonZero) : fileDurationNonZero;
 
-  const width = 'to' in waveform ? ((Math.min(waveform.to, fileDurationNonZero) - waveform.from) / fileDurationNonZero) * 100 : 100;
+  // the parts of the waveform that are visible on the (possibly collapsed) timeline
+  const pieces = useMemo(() => mapping.ranges.flatMap((range) => {
+    const start = Math.max(from, range.start);
+    const end = Math.min(to, range.end);
+    if (end <= start) return [];
+    const length = end - start;
+    const outerStyle: CSSProperties = { pointerEvents: 'none', position: 'absolute', height: '100%', overflow: 'hidden', left: `${(mapping.fileToTimeline(start) / mapping.duration) * 100}%`, width: `${(length / mapping.duration) * 100}%` };
+    const innerStyle: CSSProperties = { pointerEvents: 'none', position: 'absolute', height: '100%', left: `${-((start - from) / length) * 100}%`, width: `${((to - from) / length) * 100}%`, filter: darkMode ? undefined : 'invert(1)', imageRendering: 'pixelated' };
+    return [{ start, outerStyle, innerStyle }];
+  }), [darkMode, from, mapping, to]);
 
-  const style = useMemo<CSSProperties>(() => ({
-    pointerEvents: 'none', position: 'absolute', height: '100%', left: leftPos, width: `${width}%`, filter: darkMode ? undefined : 'invert(1)', imageRendering: 'pixelated',
-  }), [darkMode, leftPos, width]);
-
-  if (waveform.url == null) {
-    return <div style={{ ...style }} className={styles['loading-bg']} />;
-  }
-
-  return (
-    <img src={waveform.url} draggable={false} style={style} alt="" />
-  );
+  return pieces.map(({ start, outerStyle, innerStyle }) => (
+    <div key={start} style={outerStyle}>
+      {waveform.url == null ? (
+        <div style={innerStyle} className={styles['loading-bg']} />
+      ) : (
+        <img src={waveform.url} draggable={false} style={innerStyle} alt="" />
+      )}
+    </div>
+  ));
 });
 
 // eslint-disable-next-line react/display-name
-const Waveforms = memo(({ calculateTimelinePercent, fileDurationNonZero, waveforms, overviewWaveform, zoom, darkMode, height }: {
-  calculateTimelinePercent: CalculateTimelinePercent,
+const Waveforms = memo(({ mapping, fileDurationNonZero, waveforms, overviewWaveform, zoom, darkMode, height }: {
+  mapping: TimelineMapping,
   fileDurationNonZero: number,
   waveforms: WaveformSlice[],
   overviewWaveform: OverviewWaveform | undefined,
@@ -65,9 +73,9 @@ const Waveforms = memo(({ calculateTimelinePercent, fileDurationNonZero, wavefor
 }) => (
   <div style={{ height, width: `${zoom * 100}%`, position: 'relative' }}>
     {zoom === 1 && overviewWaveform != null ? (
-      <Waveform waveform={overviewWaveform} calculateTimelinePercent={calculateTimelinePercent} fileDurationNonZero={fileDurationNonZero} darkMode={darkMode} />
+      <Waveform waveform={overviewWaveform} mapping={mapping} fileDurationNonZero={fileDurationNonZero} darkMode={darkMode} />
     ) : waveforms.map((waveform) => (
-      <Waveform key={`${waveform.from}-${waveform.to}`} waveform={waveform} calculateTimelinePercent={calculateTimelinePercent} fileDurationNonZero={fileDurationNonZero} darkMode={darkMode} />
+      <Waveform key={`${waveform.from}-${waveform.to}`} waveform={waveform} mapping={mapping} fileDurationNonZero={fileDurationNonZero} darkMode={darkMode} />
     ))}
   </div>
 ));
@@ -157,7 +165,18 @@ function Timeline({
 }) {
   const { t } = useTranslation();
 
-  const { invertCutSegments, springAnimation, segmentMouseModifierKey } = useUserSettings();
+  const { invertCutSegments, springAnimation, segmentMouseModifierKey, collapseTimelineGaps } = useUserSettings();
+
+  // When collapsed, the parts that are not covered by any segment are hidden from the timeline
+  const visibleRanges = useMemo(() => (collapseTimelineGaps && !invertCutSegments ? getVisibleRanges(cutSegments, fileDurationNonZero) : undefined), [collapseTimelineGaps, cutSegments, fileDurationNonZero, invertCutSegments]);
+  // While resizing/moving a segment, keep the layout, so that the timeline doesn't shift under the mouse
+  const [frozenRanges, setFrozenRanges] = useState<TimeRange[]>();
+  const mapping = useMemo(() => createTimelineMapping({ ranges: frozenRanges ?? visibleRanges, fileDuration: fileDurationNonZero }), [fileDurationNonZero, frozenRanges, visibleRanges]);
+  const { fileToTimeline, timelineToFile, duration: timelineDuration } = mapping;
+  const mappingRef = useRef(mapping);
+  useEffect(() => {
+    mappingRef.current = mapping;
+  }, [mapping]);
 
   const timelineScrollerRef = useRef<HTMLDivElement>(null);
   const timelineScrollerSkipEventRef = useRef<boolean>(false);
@@ -166,27 +185,36 @@ function Timeline({
 
   const isZoomed = zoom > 1;
 
-  const keyFramesInZoomWindow = useMemo(() => (zoomWindowEndTime == null ? [] : neighbouringKeyFrames.filter((f) => f.time >= zoomWindowStartTime && f.time <= zoomWindowEndTime)), [neighbouringKeyFrames, zoomWindowEndTime, zoomWindowStartTime]);
+  const keyFramesInZoomWindow = useMemo(() => {
+    if (zoomWindowEndTime == null) return [];
+    const windowStart = fileToTimeline(zoomWindowStartTime);
+    const windowEnd = windowStart + timelineDuration / zoom;
+    return neighbouringKeyFrames.filter((f) => {
+      if (!mapping.isVisible(f.time)) return false;
+      const pos = fileToTimeline(f.time);
+      return pos >= windowStart && pos <= windowEnd;
+    });
+  }, [fileToTimeline, mapping, neighbouringKeyFrames, timelineDuration, zoom, zoomWindowEndTime, zoomWindowStartTime]);
 
   // Don't show keyframes if too packed together (at current zoom)
   // See https://github.com/mifi/lossless-cut/issues/259
   const areKeyframesTooClose = keyFramesInZoomWindow.length > zoom * 200;
 
-  const calculateTimelinePercent = useCallback((time: number) => calculateTimelinePercent2(time, fileDurationNonZero), [fileDurationNonZero]);
-  const currentTimePercent = useMemo(() => calculateTimelinePercent2(playerTime, fileDurationNonZero), [fileDurationNonZero, playerTime]);
-  const commandedTimePercent = useMemo(() => calculateTimelinePercent2(commandedTime, fileDurationNonZero), [commandedTime, fileDurationNonZero]);
+  const getTimelinePos = useCallback((time: number) => fileToTimeline(time) / timelineDuration, [fileToTimeline, timelineDuration]);
+  const currentTimePercent = useMemo(() => calculateTimelinePercent2(playerTime != null ? fileToTimeline(playerTime) : undefined, timelineDuration), [fileToTimeline, playerTime, timelineDuration]);
+  const commandedTimePercent = useMemo(() => calculateTimelinePercent2(fileToTimeline(commandedTime), timelineDuration), [commandedTime, fileToTimeline, timelineDuration]);
 
   const timeOfInterestPosPixels = useMemo(() => {
     // https://github.com/mifi/lossless-cut/issues/676
-    const pos = calculateTimelinePos(relevantTime, fileDurationNonZero);
+    const pos = calculateTimelinePos(fileToTimeline(relevantTime), timelineDuration);
     // eslint-disable-next-line react-hooks/refs
     if (pos != null && timelineScrollerRef.current) return pos * zoom * timelineScrollerRef.current!.offsetWidth;
     return undefined;
-  }, [fileDurationNonZero, relevantTime, zoom]);
+  }, [fileToTimeline, relevantTime, timelineDuration, zoom]);
 
   const calcZoomWindowStartTime = useCallback(() => (timelineScrollerRef.current
-    ? (timelineScrollerRef.current.scrollLeft / (timelineScrollerRef.current!.offsetWidth * zoom)) * fileDurationNonZero
-    : 0), [fileDurationNonZero, zoom]);
+    ? timelineToFile((timelineScrollerRef.current.scrollLeft / (timelineScrollerRef.current!.offsetWidth * zoom)) * timelineDuration)
+    : 0), [timelineDuration, timelineToFile, zoom]);
 
   // const zoomWindowStartTime = calcZoomWindowStartTime(duration, zoom);
 
@@ -235,7 +263,8 @@ function Timeline({
       invariant(timelineScrollerRef.current != null);
       const zoomedTargetWidth = timelineScrollerRef.current.offsetWidth * zoom;
 
-      const scrollLeft = Math.max((commandedTimeRef.current / fileDurationNonZero) * zoomedTargetWidth - timelineScrollerRef.current.offsetWidth / 2, 0);
+      // mapping from ref, so that we don't scroll every time a segment changes
+      const scrollLeft = Math.max((mappingRef.current.fileToTimeline(commandedTimeRef.current) / mappingRef.current.duration) * zoomedTargetWidth - timelineScrollerRef.current.offsetWidth / 2, 0);
       scrollLeftMotion.set(scrollLeft);
       timelineScrollerRef.current.scrollLeft = scrollLeft;
     }
@@ -273,8 +302,8 @@ function Timeline({
     invariant(target != null);
     const rect = target.getBoundingClientRect();
     const relX = e.pageX - (rect.left + document.body.scrollLeft);
-    return (relX / target.offsetWidth) * fileDurationNonZero;
-  }, [fileDurationNonZero]);
+    return timelineToFile((relX / target.offsetWidth) * timelineDuration);
+  }, [timelineDuration, timelineToFile]);
 
   const mouseDownRef = useRef<unknown>(undefined);
 
@@ -300,17 +329,20 @@ function Timeline({
     const currentCutSeg = currentCutSegRef.current;
 
     // start/end handles 1.5% of visible timeline
-    const threshold = ((0.01 / 2) * fileDurationNonZero) / zoom;
+    const threshold = ((0.01 / 2) * timelineDuration) / zoom;
+    const isNear = (time: number) => Math.abs(fileToTimeline(mouseTimelinePos) - fileToTimeline(time)) < threshold;
 
     if (currentCutSeg != null && currentCutSeg.selected && e[keyMap[segmentMouseModifierKey]]) {
-      if (Math.abs(mouseTimelinePos - currentCutSeg.start) < threshold) {
+      if (isNear(currentCutSeg.start)) {
         resizingSegmentRef.current = { operation: currentCutSeg.end == null ? 'move' : 'start' }; // move marker or resize segment
-      } else if (currentCutSeg.end != null && Math.abs(mouseTimelinePos - currentCutSeg.end) < threshold) {
+      } else if (currentCutSeg.end != null && isNear(currentCutSeg.end)) {
         resizingSegmentRef.current = { operation: 'end' };
       } else if (currentCutSeg.end != null && mouseTimelinePos >= currentCutSeg.start && mouseTimelinePos <= currentCutSeg.end) {
         resizingSegmentRef.current = { operation: 'move', offset: mouseTimelinePos - currentCutSeg.start };
       }
     }
+
+    if (resizingSegmentRef.current != null && mapping.collapsed) setFrozenRanges(mapping.ranges);
 
     mouseDownRef.current = e.target;
 
@@ -335,6 +367,7 @@ function Timeline({
     function onMouseUp() {
       mouseDownRef.current = undefined;
       resizingSegmentRef.current = undefined;
+      setFrozenRanges(undefined);
       window.removeEventListener('mouseup', onMouseUp);
       window.removeEventListener('mousemove', onMouseMove);
     }
@@ -344,7 +377,7 @@ function Timeline({
     // https://stackoverflow.com/questions/6073505/what-is-the-difference-between-screenx-y-clientx-y-and-pagex-y
     window.addEventListener('mouseup', onMouseUp, { once: true });
     window.addEventListener('mousemove', onMouseMove);
-  }, [fileDurationNonZero, getMouseTimelinePos, seekAbs, segmentMouseModifierKey, setCutTime, zoom]);
+  }, [fileToTimeline, getMouseTimelinePos, mapping, seekAbs, segmentMouseModifierKey, setCutTime, timelineDuration, zoom]);
 
   const onMouseMove = useCallback<MouseEventHandler<HTMLDivElement>>((e) => {
     if (!mouseDownRef.current) { // no button pressed
@@ -360,6 +393,17 @@ function Timeline({
   ], [goToTimecode, t]);
 
   useContextMenu(timelineScrollerRef, contextMenuTemplate);
+
+  const visibleThumbnails = useMemo(() => thumbnails.filter((thumbnail) => mapping.isVisible(thumbnail.time)), [mapping, thumbnails]);
+
+  // where hidden parts were removed from the timeline
+  const collapsedPoints = useMemo(() => {
+    const { ranges } = mapping;
+    const points = ranges.slice(1).map(({ start }) => start);
+    if (ranges[0]!.start > 0) points.unshift(ranges[0]!.start);
+    if (ranges.at(-1)!.end < fileDurationNonZero) points.push(ranges.at(-1)!.end);
+    return points;
+  }, [fileDurationNonZero, mapping]);
 
   const onGenerateOverviewWaveformClick2 = useCallback<MouseEventHandler<HTMLButtonElement>>((e) => {
     e.preventDefault(); // todo this doesn't work. dunno why
@@ -392,7 +436,7 @@ function Timeline({
       >
         {waveformEnabled && shouldShowWaveform && (waveforms.length > 0 || overviewWaveform != null) && (
           <Waveforms
-            calculateTimelinePercent={calculateTimelinePercent}
+            mapping={mapping}
             fileDurationNonZero={fileDurationNonZero}
             waveforms={waveforms}
             overviewWaveform={overviewWaveform}
@@ -404,11 +448,11 @@ function Timeline({
 
         {showThumbnails && (
           <div style={{ height: 60, width: `${zoom * 100}%`, position: 'relative', marginBottom: 3 }}>
-            {thumbnails.map((thumbnail, i) => {
-              const leftPercent = (thumbnail.time / fileDurationNonZero) * 100;
-              const nextThumbnail = thumbnails[i + 1];
-              const nextThumbTime = nextThumbnail ? nextThumbnail.time : fileDurationNonZero;
-              const maxWidthPercent = ((nextThumbTime - thumbnail.time) / fileDurationNonZero) * 100 * 0.9;
+            {visibleThumbnails.map((thumbnail, i) => {
+              const leftPercent = getTimelinePos(thumbnail.time) * 100;
+              const nextThumbnail = visibleThumbnails[i + 1];
+              const nextThumbPos = nextThumbnail ? getTimelinePos(nextThumbnail.time) : 1;
+              const maxWidthPercent = (nextThumbPos - getTimelinePos(thumbnail.time)) * 100 * 0.9;
               return (
                 <img key={thumbnail.url} src={thumbnail.url} alt="" style={{ position: 'absolute', left: `${leftPercent}%`, height: '100%', boxSizing: 'border-box', maxWidth: `${maxWidthPercent}%`, objectFit: 'cover', border: '1px solid rgba(255, 255, 255, 0.5)', borderBottomRightRadius: 15, borderTopLeftRadius: 15, borderTopRightRadius: 15, pointerEvents: 'none' }} />
               );
@@ -420,7 +464,9 @@ function Timeline({
           style={{ height: timelineHeight, width: `${zoom * 100}%`, position: 'relative', backgroundColor: timelineBackground, transition: darkModeTransition }}
           ref={timelineWrapperRef}
         >
-          {inverseCutSegments.map((seg) => (
+          {mapping.collapsed ? collapsedPoints.map((time) => (
+            <div key={time} style={{ position: 'absolute', top: 0, bottom: 0, left: `${getTimelinePos(time) * 100}%`, width: 0, marginLeft: -1, borderLeft: '2px dashed var(--gray-10)', pointerEvents: 'none' }} />
+          )) : inverseCutSegments.map((seg) => (
             <BetweenSegments
               key={seg.segId}
               start={seg.start}
@@ -440,7 +486,7 @@ function Timeline({
                 segNum={i}
                 onSegClick={setCurrentSegIndex}
                 isActive={i === currentSegIndexSafe}
-                fileDurationNonZero={fileDurationNonZero}
+                getTimelinePos={getTimelinePos}
                 invertCutSegments={invertCutSegments}
                 formatTimecode={formatTimecode}
                 selected={selected}
@@ -449,7 +495,7 @@ function Timeline({
           })}
 
           {shouldShowKeyframes && !areKeyframesTooClose && keyFramesInZoomWindow.map((f) => (
-            <div key={f.time} style={{ position: 'absolute', top: 0, bottom: 0, left: `${(f.time / fileDurationNonZero) * 100}%`, marginLeft: -1, width: 1, background: 'var(--gray-10)', boxShadow: '1px 0 0 var(--gray-1)', pointerEvents: 'none' }} />
+            <div key={f.time} style={{ position: 'absolute', top: 0, bottom: 0, left: `${getTimelinePos(f.time) * 100}%`, marginLeft: -1, width: 1, background: 'var(--gray-10)', boxShadow: '1px 0 0 var(--gray-1)', pointerEvents: 'none' }} />
           ))}
 
           {currentTimePercent !== undefined && (
