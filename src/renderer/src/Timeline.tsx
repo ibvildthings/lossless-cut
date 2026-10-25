@@ -165,10 +165,10 @@ function Timeline({
 }) {
   const { t } = useTranslation();
 
-  const { invertCutSegments, springAnimation, segmentMouseModifierKey, collapseTimelineGaps } = useUserSettings();
+  const { invertCutSegments, springAnimation, segmentMouseModifierKey, hideTimelineGaps } = useUserSettings();
 
   // When collapsed, the parts that are not covered by any segment are hidden from the timeline
-  const visibleRanges = useMemo(() => (collapseTimelineGaps && !invertCutSegments ? getVisibleRanges(cutSegments, fileDurationNonZero) : undefined), [collapseTimelineGaps, cutSegments, fileDurationNonZero, invertCutSegments]);
+  const visibleRanges = useMemo(() => (hideTimelineGaps && !invertCutSegments ? getVisibleRanges(cutSegments, fileDurationNonZero) : undefined), [hideTimelineGaps, cutSegments, fileDurationNonZero, invertCutSegments]);
   // While resizing/moving a segment, keep the layout, so that the timeline doesn't shift under the mouse
   const [frozenRanges, setFrozenRanges] = useState<TimeRange[]>();
   const mapping = useMemo(() => createTimelineMapping({ ranges: frozenRanges ?? visibleRanges, fileDuration: fileDurationNonZero }), [fileDurationNonZero, frozenRanges, visibleRanges]);

@@ -273,7 +273,8 @@ const scenarios: Record<string, Scenario> = {
   'collapse-timeline': {
     description: 'Hide the removed parts, so that the parts you keep fill the timeline',
     clips: ['DJI_0759.MP4'],
-    config: { thumbnailsEnabled: true },
+    // start with the gaps shown, to show the difference
+    config: { thumbnailsEnabled: true, hideTimelineGaps: false },
     async run({ open, action, shot, wait, caption }) {
       await open('DJI_0759.MP4');
       await wait(3000);
@@ -294,7 +295,7 @@ const scenarios: Record<string, Scenario> = {
       }
       await shot('removed');
       caption('Hide the gaps, like in a video editor');
-      await action('toggleCollapseTimelineGaps');
+      await action('toggleHideTimelineGaps');
       await wait(3000);
       await shot('collapsed');
     },
