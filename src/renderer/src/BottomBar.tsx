@@ -287,7 +287,7 @@ function BottomBar({
   playing, shortStep, togglePlay, toggleLoopSelectedSegments, hasAudio,
   keyframesEnabled, toggleShowKeyframes, seekClosestKeyframe, detectedFps, isFileOpened, selectedSegments,
   darkMode,
-  toggleShowThumbnails, toggleWaveformMode, waveformMode, showThumbnails, toggleCollapseTimelineGaps,
+  toggleShowThumbnails, toggleWaveformMode, waveformMode, showThumbnails, toggleHideTimelineGaps,
   outputPlaybackRate, setOutputPlaybackRate,
   formatTimecode, parseTimecode, playbackRate,
   currentFrame, playbackMode, displayTime, fileDurationNonZero, getFrameCount,
@@ -330,7 +330,7 @@ function BottomBar({
   selectedSegments: SegmentColorIndex[],
   darkMode: boolean,
   toggleShowThumbnails: () => void,
-  toggleCollapseTimelineGaps: () => void,
+  toggleHideTimelineGaps: () => void,
   toggleWaveformMode: () => void,
   waveformMode: WaveformMode | undefined,
   showThumbnails: boolean,
@@ -393,7 +393,7 @@ function BottomBar({
     color: currentFrame?.keyframe ? primaryTextColor : undefined,
   }), [currentFrame]);
 
-  const { invertCutSegments, setInvertCutSegments, simpleMode, toggleSimpleMode, exportConfirmEnabled, collapseTimelineGaps } = useUserSettings();
+  const { invertCutSegments, setInvertCutSegments, simpleMode, toggleSimpleMode, exportConfirmEnabled, hideTimelineGaps } = useUserSettings();
   const actionTitle = useActionTitle();
 
   const rotationStr = `${rotation}°`;
@@ -477,10 +477,10 @@ function BottomBar({
           )}
 
           <FaCompressArrowsAlt
-            style={{ fontSize: '1em', padding: '0 .2em', color: collapseTimelineGaps ? primaryTextColor : undefined }}
+            style={{ fontSize: '1em', padding: '0 .2em', color: hideTimelineGaps ? primaryTextColor : undefined }}
             role="button"
-            title={actionTitle(t('Hide removed parts from timeline'), 'toggleCollapseTimelineGaps')}
-            onClick={toggleCollapseTimelineGaps}
+            title={actionTitle(t('Hide removed parts from timeline'), 'toggleHideTimelineGaps')}
+            onClick={toggleHideTimelineGaps}
           />
         </div>
 

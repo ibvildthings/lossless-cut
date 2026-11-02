@@ -172,7 +172,7 @@ const defaults: Config = {
   waveformMode: undefined,
   thumbnailsEnabled: false,
   keyframesEnabled: true,
-  collapseTimelineGaps: true,
+  hideTimelineGaps: true,
   reducedMotion: 'user',
   ffmpegHwaccel: 'none',
 };
