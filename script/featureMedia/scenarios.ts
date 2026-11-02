@@ -270,6 +270,35 @@ const scenarios: Record<string, Scenario> = {
       await shot('inverted');
     },
   },
+  'collapse-timeline': {
+    description: 'Hide the removed parts, so that the parts you keep fill the timeline',
+    clips: ['DJI_0759.MP4'],
+    config: { thumbnailsEnabled: true },
+    async run({ open, action, shot, wait, caption }) {
+      await open('DJI_0759.MP4');
+      await wait(3000);
+      caption('Split it into parts');
+      for (const time of ['00:00:05', '00:00:09', '00:00:16', '00:00:19']) {
+        await action('goToTimecodeDirect', { time });
+        await action('splitCurrentSegment');
+        await wait(500);
+      }
+      caption('Remove the parts you don\'t want');
+      for (const time of ['00:00:07', '00:00:17']) {
+        await action('goToTimecodeDirect', { time });
+        await wait(300);
+        await action('focusSegmentAtCursor');
+        await wait(300);
+        await action('removeCurrentSegment');
+        await wait(1000);
+      }
+      await shot('removed');
+      caption('Hide the gaps, like in a video editor');
+      await action('toggleCollapseTimelineGaps');
+      await wait(3000);
+      await shot('collapsed');
+    },
+  },
   'merge-cuts': {
     description: 'Cut out three parts and merge them into one file',
     clips: ['DJI_0759.MP4'],

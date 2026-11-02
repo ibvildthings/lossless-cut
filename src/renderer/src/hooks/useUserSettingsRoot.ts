@@ -201,6 +201,8 @@ export default function useUserSettingsRoot() {
   useEffect(() => safeSetConfig({ thumbnailsEnabled }), [thumbnailsEnabled]);
   const [keyframesEnabled, setKeyframesEnabled] = useState(safeGetConfigInitial('keyframesEnabled'));
   useEffect(() => safeSetConfig({ keyframesEnabled }), [keyframesEnabled]);
+  const [collapseTimelineGaps, setCollapseTimelineGaps] = useState(safeGetConfigInitial('collapseTimelineGaps'));
+  useEffect(() => safeSetConfig({ collapseTimelineGaps }), [collapseTimelineGaps]);
   const [reducedMotion, setReducedMotion] = useState(safeGetConfigInitial('reducedMotion'));
   useEffect(() => safeSetConfig({ reducedMotion }), [reducedMotion]);
   const [ffmpegHwaccel, setFfmpegHwaccel] = useState(safeGetConfigInitial('ffmpegHwaccel'));
@@ -328,6 +330,7 @@ export default function useUserSettingsRoot() {
     waveformMode,
     thumbnailsEnabled,
     keyframesEnabled,
+    collapseTimelineGaps,
     reducedMotion,
     ffmpegHwaccel,
   };
@@ -413,6 +416,7 @@ export default function useUserSettingsRoot() {
     setWaveformMode,
     setThumbnailsEnabled,
     setKeyframesEnabled,
+    setCollapseTimelineGaps,
     prefersReducedMotion,
     setReducedMotion,
     setFfmpegHwaccel,
