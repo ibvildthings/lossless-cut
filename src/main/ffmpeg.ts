@@ -6,8 +6,8 @@ import type { Options as ExecaOptions, ResultPromise } from 'execa';
 import { execa } from 'execa';
 import assert from 'node:assert';
 import type { Readable } from 'node:stream';
-// eslint-disable-next-line import/no-extraneous-dependencies
-import { app, clipboard, nativeImage } from 'electron';
+// eslint-disable-next-line import-js/no-extraneous-dependencies
+import { app, clipboard, ClipboardItem, nativeImage } from 'electron';
 
 import { platform, arch, isWindows, isLinux } from './util.js';
 import type { AudioStreamInfo, CaptureFormat, FfmpegHwAccel } from '../common/types.js';
@@ -37,12 +37,11 @@ export function setCustomFfPath(path: string | undefined) {
 }
 
 function escapeCliArg(arg: string) {
-  // todo change String(arg) => arg when ts no-implicit-any is turned on
   if (isWindows) {
     // https://github.com/mifi/lossless-cut/issues/2151
-    return /[\s"&<>^|]/.test(arg) ? `"${String(arg).replaceAll('"', '""')}"` : arg;
+    return /[\s"&<>^|]/.test(arg) ? `"${arg.replaceAll('"', '""')}"` : arg;
   }
-  return /[^\w-]/.test(arg) ? `'${String(arg).replaceAll("'", '\'"\'"\'')}'` : arg;
+  return /[^\w-]/.test(arg) ? `'${arg.replaceAll("'", '\'"\'"\'')}'` : arg;
 }
 
 export type FfCommand = 'ffmpeg' | 'ffprobe';
@@ -79,9 +78,7 @@ export async function checkFfExists(cmd: FfCommand) {
 }
 
 const getFfprobePath = () => getFfPath('ffprobe');
-/**
- * ⚠️ Do not use directly when running ffmpeg, because we need to add certain options before running, like `LD_LIBRARY_PATH` on linux
- */
+/** ⚠️ Do not use directly when running ffmpeg, because we need to add certain options before running, like `LD_LIBRARY_PATH` on linux */
 export const getFfmpegPath = () => getFfPath('ffmpeg');
 
 export function abortFfmpegs() {
@@ -97,8 +94,7 @@ function handleProgress(
   onProgress: (a: number) => void,
   customMatcher?: (a: string) => void,
 ) {
-  if (!onProgress) return;
-  if (process.stderr == null) return;
+  if (!onProgress || (process.stderr == null)) return;
   onProgress(0);
 
   const rl = readline.createInterface({ input: process.stderr });
@@ -177,7 +173,7 @@ export async function runFfmpegConcat({ ffmpegArgs, concatTxt, totalDuration, on
 
   handleProgress(process, totalDuration, onProgress);
 
-  assert(process.stdin != null);
+  assert.ok(process.stdin != null);
   stringToStream(concatTxt).pipe(process.stdin);
 
   return process;
@@ -189,7 +185,7 @@ export async function runFfmpegWithProgress({ ffmpegArgs, duration, onProgress }
   onProgress: (a: number) => void,
 }) {
   const process = runFfmpegProcess(ffmpegArgs);
-  assert(process.stderr != null);
+  assert.ok(process.stderr != null);
   handleProgress(process, duration, onProgress);
   return process;
 }
@@ -263,8 +259,8 @@ export async function renderWaveformPng({ filePath, start, duration, resample, c
   try {
     ps1 = runFfmpegProcess(args1, { buffer: false, ...(timeout != null && { timeout }) }, { logCli: false });
     ps2 = runFfmpegProcess(args2, timeout != null ? { timeout } : undefined, { logCli: false });
-    assert(ps1.stdout != null);
-    assert(ps2.stdin != null);
+    assert.ok(ps1.stdout != null);
+    assert.ok(ps2.stdin != null);
     ps1.stdout.pipe(ps2.stdin);
 
     const { stdout } = await ps2;
@@ -290,13 +286,8 @@ export function mapTimesToSegments(times: number[], includeLast: boolean) {
   for (let i = 0; i < times.length; i += 1) {
     const start = times[i];
     const end = times[i + 1];
-    if (start != null) {
-      if (end != null) {
-        segments.push({ start, end });
-      } else if (includeLast) {
-        segments.push({ start, end }); // end undefined is allowed (means until end of video)
-      }
-    }
+    // end undefined is allowed for the last segment (means until end of video)
+    if (start != null && (end != null || includeLast)) segments.push({ start, end });
   }
   return segments;
 }
@@ -329,14 +320,13 @@ export async function detectSceneChanges({ filePath, streamId, minChange, onProg
 
   handleProgress(process, to - from, onProgress);
 
-  assert(process.stdout != null);
+  assert.ok(process.stdout != null);
   const rl = readline.createInterface({ input: process.stdout });
 
   let lastTime: number | undefined;
 
   rl.on('line', (line) => {
-    // eslint-disable-next-line unicorn/better-regex
-    const match = line.match(/^frame:\d+\s+pts:\d+\s+pts_time:([\d.]+)/);
+    const match = /^frame:\d+\s+pts:\d+\s+pts_time:([\d.]+)/.exec(line);
     if (!match) return;
     const time = parseFloat(match[1]!);
     if (!Number.isNaN(time)) {
@@ -433,7 +423,8 @@ export async function silenceDetect({ streamId, filterOptions, ...rest }: {
   boundingMode: boolean,
   onProgress: (p: number) => void,
   onSegmentDetected: (p: DetectedSegment) => void,
-  from: number, to: number,
+  from: number,
+  to: number,
   ffmpegHwaccel: FfmpegHwAccel,
 }) {
   return detectIntervals({
@@ -483,7 +474,7 @@ export async function captureFrames({ from, to, videoPath, outPathTemplate, qual
           '-vf', filter,
           // https://superuser.com/questions/1336285/use-ffmpeg-for-thumbnail-selections
           ...(framePts ? ['-frame_pts', '1'] : []),
-          '-vsync', '0', // else we get a ton of duplicates (thumbnail filter)
+          '-fps_mode', 'passthrough', // else we get a ton of duplicates (thumbnail filter). `-vsync` was removed in ffmpeg 9
         ] : [])
     ),
     ...getCodecOpts(captureFormat),
@@ -504,17 +495,17 @@ export async function captureFrames({ from, to, videoPath, outPathTemplate, qual
   return args;
 }
 
-function getCaptureFrameArgs({ timestamp, videoPath, quality }: {
+function getCaptureFrameArgs({ timestamp, videoPath, quality, captureFormat }: {
   timestamp: number,
   videoPath: string,
   quality: number,
+  captureFormat: CaptureFormat,
 }) {
-  const ffmpegQuality = getFfmpegJpegQuality(quality);
   return [
     '-ss', String(timestamp),
     '-i', videoPath,
     '-frames:v', '1',
-    '-q:v', String(ffmpegQuality),
+    ...getQualityOpts({ captureFormat, quality }),
   ];
 }
 
@@ -524,24 +515,26 @@ export async function captureFrameToClipboard({ timestamp, videoPath, quality }:
   quality: number,
 }) {
   const args = [
-    ...getCaptureFrameArgs({ timestamp, videoPath, quality }),
+    ...getCaptureFrameArgs({ timestamp, videoPath, quality, captureFormat: 'jpeg' }),
     '-c:v', 'mjpeg',
     '-f', 'image2',
     '-',
   ];
   const { stdout } = await runFfmpegProcess(args);
 
-  clipboard.writeImage(nativeImage.createFromBuffer(Buffer.from(stdout)));
+  const png = nativeImage.createFromBuffer(Buffer.from(stdout)).toPNG();
+  await clipboard.write([new ClipboardItem({ 'image/png': new Blob([png], { type: 'image/png' }) })]);
 }
 
-export async function captureFrameToFile({ timestamp, videoPath, outPath, quality }: {
+export async function captureFrameToFile({ timestamp, videoPath, outPath, quality, captureFormat }: {
   timestamp: number,
   videoPath: string,
   outPath: string,
   quality: number,
+  captureFormat: CaptureFormat,
 }) {
   const args = [
-    ...getCaptureFrameArgs({ timestamp, videoPath, quality }),
+    ...getCaptureFrameArgs({ timestamp, videoPath, quality, captureFormat }),
     '-y', outPath,
   ];
   await runFfmpegProcess(args);

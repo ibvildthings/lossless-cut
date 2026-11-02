@@ -1,4 +1,4 @@
-import type { CSSProperties, ClipboardEvent, Dispatch, FormEvent, KeyboardEvent, SetStateAction } from 'react';
+import type { CSSProperties, ClipboardEvent, Dispatch, SubmitEvent, KeyboardEvent, SetStateAction } from 'react';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'motion/react';
 import { MdRotate90DegreesCcw } from 'react-icons/md';
@@ -33,7 +33,7 @@ import type { Frame } from './ffmpeg';
 import mainApi from './mainApi';
 
 
-const zoomOptions = Array.from({ length: 13 }).fill(undefined).map((_unused, z) => 2 ** z);
+const zoomOptions = Array.from({ length: 13 }, (_unused, z) => 2 ** z);
 
 const leftRightWidth = 100;
 
@@ -55,9 +55,7 @@ const InvertCutModeButton = memo(({ invertCutSegments, setInvertCutSegments }: {
     setInvertCutSegments((v) => {
       const newVal = !v;
       getSwal().toast.fire({
-        title: newVal
-          ? t('When you export, selected segments on the timeline will be REMOVED - the surrounding areas will be KEPT')
-          : t('When you export, selected segments on the timeline will be KEPT - the surrounding areas will be REMOVED.'),
+        title: t(newVal ? 'When you export, selected segments on the timeline will be REMOVED - the surrounding areas will be KEPT' : 'When you export, selected segments on the timeline will be KEPT - the surrounding areas will be REMOVED.'),
       });
       return newVal;
     });
@@ -71,7 +69,7 @@ const InvertCutModeButton = memo(({ invertCutSegments, setInvertCutSegments }: {
       >
         <FaYinYang
           role="button"
-          title={invertCutSegments ? t('Discard selected segments') : t('Keep selected segments')}
+          title={t(invertCutSegments ? 'Discard selected segments' : 'Keep selected segments')}
           style={{ display: 'block', fontSize: '1.5em', color: invertCutSegments ? dangerColor : undefined }}
           onClick={onYinYangClick}
         />
@@ -149,7 +147,7 @@ const CutTimeInput = memo(({ disabled, darkMode, cutTime, setCutTime, startTimeO
     return true;
   }, [isEmptyEndTime, parseTimecode, setTime]);
 
-  const handleSubmit = useCallback((e: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = useCallback((e: SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
 
     try {
@@ -267,7 +265,7 @@ const CutTimeInput = memo(({ disabled, darkMode, cutTime, setCutTime, startTimeO
         disabled={disabled}
         style={style}
         type="text"
-        title={isStart ? t('Manually input current segment\'s start time') : t('Manually input current segment\'s end time')}
+        title={t(isStart ? 'Manually input current segment\'s start time' : 'Manually input current segment\'s end time')}
         onChange={(e) => handleCutTimeInput(e.target.value)}
         onPaste={handleCutTimePaste}
         onBlur={handleInputBlur}
@@ -392,7 +390,7 @@ function BottomBar({
   }, [playStyle, selectedSegments]);
 
   const keyframeStyle = useMemo(() => ({
-    color: currentFrame != null && currentFrame.keyframe ? primaryTextColor : undefined,
+    color: currentFrame?.keyframe ? primaryTextColor : undefined,
   }), [currentFrame]);
 
   const { invertCutSegments, setInvertCutSegments, simpleMode, toggleSimpleMode, exportConfirmEnabled, collapseTimelineGaps } = useUserSettings();
@@ -429,7 +427,7 @@ function BottomBar({
       <div
         style={segButtonStyle}
         role="button"
-        title={`${direction > 0 ? t('Select next segment') : t('Select previous segment')} (${newIndex + 1})`}
+        title={`${t(direction > 0 ? 'Select next segment' : 'Select previous segment')} (${newIndex + 1})`}
         onClick={() => seg && setCurrentSegIndex(newIndex)}
       >
         {text}

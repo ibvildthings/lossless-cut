@@ -1,4 +1,4 @@
-import type { MutableRefObject, CSSProperties, WheelEventHandler, MouseEventHandler } from 'react';
+import type { RefObject, CSSProperties, WheelEventHandler, MouseEventHandler } from 'react';
 import { memo, useRef, useMemo, useCallback, useEffect, useState } from 'react';
 import { motion, useMotionValue, useSpring } from 'motion/react';
 import debounce from 'lodash/debounce';
@@ -157,7 +157,7 @@ function Timeline({
   playing: boolean,
   isFileOpened: boolean,
   onWheel: WheelEventHandler,
-  commandedTimeRef: MutableRefObject<number>,
+  commandedTimeRef: RefObject<number>,
   goToTimecode: () => void,
   darkMode: boolean,
   setCutTime: UseSegments['setCutTime'],
@@ -180,6 +180,7 @@ function Timeline({
 
   const timelineScrollerRef = useRef<HTMLDivElement>(null);
   const timelineScrollerSkipEventRef = useRef<boolean>(false);
+  // eslint-disable-next-line @eslint-react/naming-convention-ref-name -- TODO fix (new rule in @mifi/lint-config)
   const timelineScrollerSkipEventDebounce = useRef<() => void>(undefined);
   const timelineWrapperRef = useRef<HTMLDivElement>(null);
 
@@ -208,12 +209,12 @@ function Timeline({
     // https://github.com/mifi/lossless-cut/issues/676
     const pos = calculateTimelinePos(fileToTimeline(relevantTime), timelineDuration);
     // eslint-disable-next-line react-hooks/refs
-    if (pos != null && timelineScrollerRef.current) return pos * zoom * timelineScrollerRef.current!.offsetWidth;
+    if (pos != null && timelineScrollerRef.current) return pos * zoom * timelineScrollerRef.current.offsetWidth;
     return undefined;
   }, [fileToTimeline, relevantTime, timelineDuration, zoom]);
 
   const calcZoomWindowStartTime = useCallback(() => (timelineScrollerRef.current
-    ? timelineToFile((timelineScrollerRef.current.scrollLeft / (timelineScrollerRef.current!.offsetWidth * zoom)) * timelineDuration)
+    ? timelineToFile((timelineScrollerRef.current.scrollLeft / (timelineScrollerRef.current.offsetWidth * zoom)) * timelineDuration)
     : 0), [timelineDuration, timelineToFile, zoom]);
 
   // const zoomWindowStartTime = calcZoomWindowStartTime(duration, zoom);
@@ -351,7 +352,7 @@ function Timeline({
       const mouseDragTimelinePos = getMouseTimelinePos(e2);
       seekAbs(mouseDragTimelinePos);
       try {
-        // eslint-disable-next-line unicorn/prefer-switch
+        // eslint-disable-next-line unicorn-js/prefer-switch
         if (resizingSegmentRef.current?.operation === 'start') {
           setCutTime('start', mouseDragTimelinePos);
         } else if (resizingSegmentRef?.current?.operation === 'end') {
@@ -411,7 +412,7 @@ function Timeline({
   }, [onGenerateOverviewWaveformClick]);
 
   return (
-    // eslint-disable-next-line jsx-a11y/no-static-element-interactions,jsx-a11y/mouse-events-have-key-events
+    // eslint-disable-next-line jsx-a11y/no-static-element-interactions
     <div
       className="no-user-select"
       style={{ position: 'relative', borderTop: '1px solid var(--gray-7)', borderBottom: '1px solid var(--gray-7)' }}

@@ -1,4 +1,4 @@
-import type { FormEventHandler, KeyboardEventHandler } from 'react';
+import type { SubmitEventHandler, KeyboardEventHandler } from 'react';
 import { memo, useRef, useState, useMemo, useCallback, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import invariant from 'tiny-invariant';
@@ -37,6 +37,7 @@ export const cancelTagEditOnEscape = (editingTag: string | undefined, setEditing
   setEditingTag(undefined);
 };
 
+// eslint-disable-next-line react/no-object-type-as-default-prop -- TODO fix (new rule in @mifi/lint-config)
 function TagEditor({ existingTags = emptyObject, customTags = emptyObject, editingTag, setEditingTag, onTagsChange, onTagReset, addTagTitle, tagInfo, keySuggestions, canDeleteExisting, onApplyToAll, applyToAllTitle, copyFromSources = [] }: {
   existingTags?: SegmentTags,
   customTags?: SegmentTags | undefined,
@@ -63,7 +64,7 @@ function TagEditor({ existingTags = emptyObject, customTags = emptyObject, editi
   const newTagKey = editingTag != null ? newTagKeyState : undefined;
   const [newTagKeyInput, setNewTagKeyInput] = useState<string>('');
 
-  const newTagKeyInputError = useMemo(() => !!newTagKeyInput && newTagKeyInput.includes('='), [newTagKeyInput]);
+  const newTagKeyInputError = useMemo(() => Boolean(newTagKeyInput) && newTagKeyInput.includes('='), [newTagKeyInput]);
 
   const effectiveTags = useMemo(() => ({
     ...existingTags,
@@ -133,7 +134,7 @@ function TagEditor({ existingTags = emptyObject, customTags = emptyObject, editi
     setEditingTag(undefined);
   }, [onTagsChange, setEditingTag]);
 
-  const onSubmit = useCallback<FormEventHandler<HTMLFormElement>>((e) => {
+  const onSubmit = useCallback<SubmitEventHandler<HTMLFormElement>>((e) => {
     e.preventDefault();
     onEditClick();
   }, [onEditClick]);
@@ -152,7 +153,7 @@ function TagEditor({ existingTags = emptyObject, customTags = emptyObject, editi
     setNewTagKeyInput('');
   }, [editingTag, effectiveTags, newTagKey, newTagKeyInput, newTagKeyInputError, onEditClick, setEditingTag]);
 
-  const onAddSubmit = useCallback<FormEventHandler<HTMLFormElement>>((e) => {
+  const onAddSubmit = useCallback<SubmitEventHandler<HTMLFormElement>>((e) => {
     e.preventDefault();
     add();
   }, [add]);
@@ -186,12 +187,13 @@ function TagEditor({ existingTags = emptyObject, customTags = emptyObject, editi
     <>
       <table style={{ marginBottom: '1em', width: '100%' }}>
         <tbody>
+          {/* eslint-disable-next-line unicorn-js/prefer-object-iterable-methods -- TODO fix (new rule in @mifi/lint-config) */}
           {Object.keys(effectiveTags).map((tag) => {
             const editingThis = tag === editingTag;
             const thisTagCustom = customTags[tag] != null;
             const thisTagNew = existingTags[tag] == null;
             const value = effectiveTags[tag];
-            const isDeletedExisting = !!canDeleteExisting && !value && !thisTagNew;
+            const isDeletedExisting = Boolean(canDeleteExisting) && !value && !thisTagNew;
             const editingOther = editingTag != null && !editingThis;
 
             return (

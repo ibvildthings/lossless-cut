@@ -5,12 +5,13 @@ import { dirname } from 'node:path';
 import { parseArgs } from 'node:util';
 import sharp from 'sharp';
 
+// eslint-disable-next-line unicorn-js/no-unreadable-object-destructuring -- TODO fix (new rule in @mifi/lint-config)
 const { values: { bg, position, caption, square, out }, positionals: [version, ...highlights] } = parseArgs({
   allowPositionals: true,
   options: { bg: { type: 'string' }, position: { type: 'string' }, caption: { type: 'string' }, square: { type: 'boolean' }, out: { type: 'string' } },
 });
 const usage = 'Usage: node script/releaseImage.ts <version> [--bg photo.jpg] [--position top|bottom|left|right|center] [--caption "photo caption"] [--square] [--out file.png] [up to 3 "highlights"]';
-assert(version != null && highlights.length <= 3, usage);
+assert.ok(version != null && highlights.length <= 3, usage);
 
 // 16:9 for X/Bluesky/Mastodon/Discord, or square for Instagram
 const width = square ? 1080 : 1600;
@@ -36,6 +37,7 @@ async function getAccentHue(seed: string) {
     // Unless it's (nearly) grey
     if (Math.max(r, g, b) - Math.min(r, g, b) > 20) return Math.round(((Math.atan2(Math.sqrt(3) * (g - b), 2 * r - g - b) * 180) / Math.PI + 360) % 360);
   }
+  // eslint-disable-next-line @typescript-eslint/no-misused-spread -- we want code points
   return [...seed].reduce((acc, c) => (acc * 31 + c.codePointAt(0)!) % 360, 7);
 }
 const hue = await getAccentHue(version);

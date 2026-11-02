@@ -35,7 +35,7 @@ const nonCopyableMetadataKeys = new Set<string>([...muxerWrittenMetadataKeys, ..
 const isDefaultHandlerName = (value: string) => /handler|core media|iso media|dji\./i.test(value);
 
 const isCopyableMetadata = (key: string, value: string) => {
-  const baseKey = key.toLowerCase().split('-')[0]!;
+  const baseKey = key.toLowerCase().split('-', 1)[0]!;
   if (baseKey === 'handler_name') return !isDefaultHandlerName(value);
   return !nonCopyableMetadataKeys.has(baseKey) && !baseKey.startsWith('_statistics_');
 };
@@ -93,7 +93,7 @@ export function getLanguageSuggestions(uiLanguage: string): Suggestion[] {
   }
   return languages
     .map(([value, bcp47]) => ({ value, label: `${displayNames?.of(bcp47) ?? value} (${value})` }))
-    .sort((a, b) => a.label.localeCompare(b.label));
+    .toSorted((a, b) => a.label.localeCompare(b.label));
 }
 
 export const isValidLanguageCode = (code: string) => /^[a-z]{3}$/.test(code);

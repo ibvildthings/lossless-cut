@@ -2,10 +2,11 @@ process.traceDeprecation = true;
 process.traceProcessWarnings = true;
 
 /* eslint-disable import/first */
-// eslint-disable-next-line import/no-extraneous-dependencies
-import electron, { BrowserWindow, type BrowserWindowConstructorOptions, nativeTheme, shell, app, ipcMain, Notification, type NotificationConstructorOptions } from 'electron';
+// eslint-disable-next-line import-js/no-extraneous-dependencies
+import electron, { BrowserWindow, nativeTheme, shell, app, ipcMain, Notification } from 'electron';
+import type { BrowserWindowConstructorOptions, NotificationConstructorOptions } from 'electron';
 import i18n from 'i18next';
-// eslint-disable-next-line import/no-extraneous-dependencies
+// eslint-disable-next-line import-js/no-extraneous-dependencies
 import debounce from 'lodash/debounce.js';
 import yargsParser from 'yargs-parser';
 import JSON5 from 'json5';
@@ -19,7 +20,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import electronUnhandled from 'electron-unhandled';
 import { fileTypeFromFile } from 'file-type';
 import type { Asyncify } from 'type-fest';
-// eslint-disable-next-line import/no-extraneous-dependencies
+// eslint-disable-next-line import-js/no-extraneous-dependencies
 import { downloadChromeExtension } from 'electron-devtools-installer/dist/downloadChromeExtension.js';
 import mitt from 'mitt';
 
@@ -95,7 +96,7 @@ async function sendApiAction(action: string, args?: unknown[]) {
     const id = apiActionRequestsId;
     apiActionRequestsId += 1;
     mainWindow!.webContents.send('apiAction', { id, action, args } satisfies ApiActionRequest);
-    await new Promise<void>((resolve) => apiActionRequests.set(id, resolve));
+    await new Promise<void>((resolve) => { apiActionRequests.set(id, resolve); });
   } catch (err) {
     logger.error('sendApiAction', err);
   }
@@ -107,7 +108,7 @@ export type AppEvent = {
 } | {
   eventName: 'export-start',
   path: string,
-}
+};
 
 const appEventEmitter = mitt<{ appEvent: AppEvent }>();
 
@@ -204,7 +205,7 @@ function createWindow() {
   mainWindow.on('close', (e) => {
     if (!askBeforeClose) return;
 
-    assert(mainWindow);
+    assert.ok(mainWindow);
     const choice = electron.dialog.showMessageBoxSync(mainWindow, {
       type: 'question',
       buttons: ['Yes', 'No'],
@@ -239,7 +240,7 @@ async function openExternal(url: string) {
 }
 
 function updateMenu() {
-  assert(mainWindow);
+  assert.ok(mainWindow);
   menu({ app, mainWindow, newVersion, isStoreBuild, openExternal });
 }
 
@@ -278,7 +279,6 @@ function parseCliArgs(rawArgv = process.argv) {
 const argv = parseCliArgs();
 
 const lossyModeSchema = z.object({ videoEncoder: z.union([z.literal('libx264'), z.literal('libx265'), z.literal('libsvtav1')]) });
-// eslint-disable-next-line prefer-destructuring
 const lossyMode = argv['lossyMode'] ? lossyModeSchema.parse(JSON5.parse(argv['lossyMode'])) : undefined;
 
 export type LossyMode = z.infer<typeof lossyModeSchema>;
@@ -424,7 +424,7 @@ async function init() {
 
 
     if (isDev) {
-      // eslint-disable-next-line @typescript-eslint/no-var-requires,global-require,import/no-extraneous-dependencies
+      // eslint-disable-next-line @typescript-eslint/no-var-requires,global-require,import-js/no-extraneous-dependencies
       installReactDevTools()
         .then((extension) => logger.info('Added Extension', extension.name))
         .catch((err: unknown) => logger.error('Failed to add extension', err));
@@ -520,7 +520,7 @@ app.addListener('remote-require', (event: { returnValue: RemoteApiLegacy }, _web
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 ipcMain.handle('__electron_rpc__', async (_event, method: keyof RemoteApi, args: any[]) => {
   const fn = remoteApi[method];
-  assert(fn, `Unknown API method: ${method}`);
+  assert.ok(fn, `Unknown API method: ${method}`);
   // @ts-expect-error don't know how to type
   return fn(...args);
 });
